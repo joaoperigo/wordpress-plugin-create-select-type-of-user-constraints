@@ -2,7 +2,6 @@
 /*
 Plugin Name: Course Management System
 Description: Manages course assignments and progress for different professional areas
-Author: João Périgo
 Version: 1.0
 */
 
@@ -59,6 +58,169 @@ class CourseManagementSystem {
         add_action('wp_ajax_update_user_course', [$this, 'update_user_course']);
         add_action('wp_ajax_update_discipline_progress', [$this, 'update_discipline_progress']);
         add_action('wp_ajax_get_user_disciplines', [$this, 'get_user_disciplines']);
+        
+        // Registrar shortcodes
+        add_shortcode('course_progress', [$this, 'render_course_progress']);
+        add_shortcode('discipline_schedule', [$this, 'render_discipline_schedule']);
+    }
+
+    public function render_course_progress($atts) {
+        if (!is_user_logged_in()) {
+            return '<p>Por favor, faça login para ver seu progresso no curso.</p>';
+        }
+
+        $user_id = get_current_user_id();
+        $course_data = get_user_meta($user_id, 'course_data', true);
+        
+        if (!$course_data) {
+            return '<p>Nenhum curso encontrado.</p>';
+        }
+
+        $course_data = json_decode($course_data, true);
+        $course_type = $course_data['curso'];
+        $requirements = $this->course_requirements[$course_type] ?? $this->course_requirements['default'];
+
+        // Calcula totais
+        $total_hours_required = array_sum($requirements);
+        $total_hours_completed = 0;
+        foreach ($course_data['disciplinas'] as $disc_key => $disc_data) {
+            $total_hours_completed += $disc_data[1] * 10; // dias * 10 horas
+        }
+
+        $output = '<div class="course-progress">';
+        $output .= sprintf(
+            '<h3>Progresso do Curso: %s</h3>',
+            esc_html($this->courses[$course_type]['name'])
+        );
+        
+        $output .= sprintf(
+            '<p class="course-totals">Total Cursado: %d horas de %d horas necessárias</p>',
+            $total_hours_completed,
+            $total_hours_required
+        );
+
+        $output .= '<div class="disciplines-list">';
+        
+        foreach ($course_data['disciplinas'] as $disc_key => $disc_data) {
+            $status = $disc_data[0];
+            $days = $disc_data[1];
+            $complete = $disc_data[2];
+            $current_hours = $days * 10;
+            $required_hours = $requirements[$disc_key];
+            
+            $disc_class = $status === 'bloqueado' ? 'discipline-blocked' : 'discipline-' . $complete;
+            
+            $output .= sprintf(
+                '<div class="discipline-item %s">
+                    <h4>%s</h4>
+                    <p class="discipline-hours">Horas cursadas: %d de %d necessárias</p>',
+                $disc_class,
+                esc_html($this->disciplines[$disc_key]),
+                $current_hours,
+                $required_hours
+            );
+
+            if ($status === 'bloqueado') {
+                $output .= '<p class="discipline-status blocked">Disciplina Bloqueada</p>';
+            } elseif ($complete === 'completo') {
+                $output .= '<p class="discipline-status complete">Disciplina Completada</p>';
+            } else {
+                // Se está liberada e incompleta, procura um shortcode específico
+                $shortcode = $this->get_discipline_shortcode($disc_key);
+                if ($shortcode) {
+                    $output .= do_shortcode($shortcode);
+                }
+            }
+
+            $output .= '</div>';
+        }
+
+        $output .= '</div></div>';
+
+        // Adiciona CSS
+        $output .= '
+        <style>
+            .course-progress {
+                max-width: 800px;
+                margin: 20px auto;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            }
+            .discipline-item {
+                background: #fff;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 10px 0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .discipline-blocked {
+                opacity: 0.6;
+                background: #f5f5f5;
+            }
+            .discipline-item h4 {
+                margin: 0 0 10px 0;
+                color: #333;
+            }
+            .discipline-hours {
+                color: #666;
+                margin: 5px 0;
+            }
+            .discipline-status {
+                font-weight: 500;
+                margin: 10px 0;
+            }
+            .discipline-status.blocked {
+                color: #888;
+            }
+            .discipline-status.complete {
+                color: #4CAF50;
+            }
+            .course-totals {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 6px;
+                margin: 20px 0;
+                text-align: center;
+                font-weight: 500;
+            }
+        </style>';
+
+        return $output;
+    }
+
+    private function get_discipline_shortcode($discipline_key) {
+        // Mapeamento de disciplinas para shortcodes
+        $shortcodes = [
+            'toxina' => '[latepoint_resources items="services" group_ids="1"]',
+            // Adicione mais shortcodes conforme necessário
+        ];
+
+        return $shortcodes[$discipline_key] ?? '';
+    }
+
+    public function render_discipline_schedule($atts) {
+        $atts = shortcode_atts([
+            'discipline' => '',
+        ], $atts);
+
+        if (!is_user_logged_in() || empty($atts['discipline'])) {
+            return '';
+        }
+
+        $user_id = get_current_user_id();
+        $course_data = json_decode(get_user_meta($user_id, 'course_data', true), true);
+
+        if (!$course_data || !isset($course_data['disciplinas'][$atts['discipline']])) {
+            return '';
+        }
+
+        $disc_data = $course_data['disciplinas'][$atts['discipline']];
+        
+        // Só mostra o shortcode se a disciplina estiver liberada e incompleta
+        if ($disc_data[0] === 'liberado' && $disc_data[2] === 'incompleto') {
+            return do_shortcode($this->get_discipline_shortcode($atts['discipline']));
+        }
+
+        return '';
     }
     
     public function get_user_disciplines() {
