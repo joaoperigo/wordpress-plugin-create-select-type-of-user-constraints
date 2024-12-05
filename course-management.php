@@ -2,6 +2,7 @@
 /*
 Plugin Name: Course Management System
 Description: Manages course assignments and progress for different professional areas
+Author: João Périgo
 Version: 1.0
 */
 
@@ -57,6 +58,45 @@ class CourseManagementSystem {
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
         add_action('wp_ajax_update_user_course', [$this, 'update_user_course']);
         add_action('wp_ajax_update_discipline_progress', [$this, 'update_discipline_progress']);
+        add_action('wp_ajax_get_user_disciplines', [$this, 'get_user_disciplines']);
+    }
+    
+    public function get_user_disciplines() {
+        check_ajax_referer('course_management_nonce', 'nonce');
+
+        $user_id = intval($_POST['user_id']);
+
+        if (!current_user_can('manage_options') || !$user_id) {
+            wp_send_json_error('Permissão negada');
+        }
+
+        $course_data = get_user_meta($user_id, 'course_data', true);
+        if (!$course_data) {
+            wp_send_json_error('Dados do curso não encontrados');
+        }
+
+        $course_data = json_decode($course_data, true);
+        $course_type = $course_data['curso'];
+        $requirements = $this->course_requirements[$course_type] ?? $this->course_requirements['default'];
+
+        $response_data = [
+            'user_id' => $user_id,
+            'course' => $course_type,
+            'disciplines' => []
+        ];
+
+        foreach ($course_data['disciplinas'] as $disc_key => $disc_data) {
+            $response_data['disciplines'][$disc_key] = [
+                'name' => $this->disciplines[$disc_key],
+                'status' => $disc_data[0],
+                'days' => $disc_data[1],
+                'complete' => $disc_data[2],
+                'required_hours' => $requirements[$disc_key],
+                'current_hours' => $disc_data[1] * 10
+            ];
+        }
+
+        wp_send_json_success($response_data);
     }
 
     public function add_admin_menu() {
@@ -169,9 +209,7 @@ class CourseManagementSystem {
         check_ajax_referer('course_management_nonce', 'nonce');
 
         $user_id = intval($_POST['user_id']);
-        $discipline = sanitize_text_field($_POST['discipline']);
-        $status = sanitize_text_field($_POST['status']);
-        $days = intval($_POST['days']);
+        $disciplines = json_decode(stripslashes($_POST['disciplines']), true);
 
         if (!current_user_can('manage_options') || !$user_id) {
             wp_send_json_error('Permissão negada');
@@ -182,15 +220,19 @@ class CourseManagementSystem {
             wp_send_json_error('Dados do curso não encontrados');
         }
 
-        $hours = $days * 10;
-        $required_hours = $this->course_requirements[$course_data['curso']][$discipline] ?? 
-                         $this->course_requirements['default'][$discipline];
-        
-        $course_data['disciplinas'][$discipline] = [
-            $status,
-            $days,
-            $hours >= $required_hours ? 'completo' : 'incompleto'
-        ];
+        foreach ($disciplines as $discipline_key => $discipline_data) {
+            $status = sanitize_text_field($discipline_data['status']);
+            $days = intval($discipline_data['days']);
+            $hours = $days * 10;
+            $required_hours = $this->course_requirements[$course_data['curso']][$discipline_key] ?? 
+                            $this->course_requirements['default'][$discipline_key];
+            
+            $course_data['disciplinas'][$discipline_key] = [
+                $status,
+                $days,
+                $hours >= $required_hours ? 'completo' : 'incompleto'
+            ];
+        }
 
         update_user_meta($user_id, 'course_data', json_encode($course_data));
         wp_send_json_success('Progresso atualizado com sucesso');

@@ -71,7 +71,19 @@ jQuery(document).ready(function($) {
     // Handle discipline form submission
     $(document).on('submit', '#discipline-form', function(e) {
         e.preventDefault();
-        const formData = $(this).serializeArray();
+        const userId = $(this).find('input[name="user_id"]').val();
+        const disciplines = {};
+        
+        // Collect all discipline data
+        $(this).find('tr').each(function() {
+            const disciplineKey = $(this).data('discipline');
+            if (disciplineKey) {
+                disciplines[disciplineKey] = {
+                    status: $(this).find(`select[name="status_${disciplineKey}"]`).val(),
+                    days: parseInt($(this).find(`input[name="days_${disciplineKey}"]`).val(), 10)
+                };
+            }
+        });
         
         $.ajax({
             url: courseManagement.ajax_url,
@@ -79,7 +91,8 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'update_discipline_progress',
                 nonce: courseManagement.nonce,
-                ...formData
+                user_id: userId,
+                disciplines: JSON.stringify(disciplines)
             },
             success: function(response) {
                 if (response.success) {
@@ -102,11 +115,51 @@ jQuery(document).ready(function($) {
     });
 
     function buildDisciplineForm(data) {
-        // Build the form HTML based on the discipline data
-        // This would create inputs for status, days, etc.
-        let html = `<form id="discipline-form">`;
-        // Add form fields here
-        html += `</form>`;
+        let html = `<form id="discipline-form">
+            <input type="hidden" name="user_id" value="${data.user_id}">
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Disciplina</th>
+                        <th>Status</th>
+                        <th>Dias de Presença</th>
+                        <th>Horas Totais</th>
+                        <th>Horas Necessárias</th>
+                        <th>Status Conclusão</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+        Object.entries(data.disciplines).forEach(([key, disc]) => {
+            html += `
+                <tr data-discipline="${key}">
+                    <td>${disc.name}</td>
+                    <td>
+                        <select name="status_${key}">
+                            <option value="bloqueado" ${disc.status === 'bloqueado' ? 'selected' : ''}>Bloqueado</option>
+                            <option value="liberado" ${disc.status === 'liberado' ? 'selected' : ''}>Liberado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" 
+                               name="days_${key}" 
+                               value="${disc.days}" 
+                               min="0" 
+                               max="${Math.ceil(disc.required_hours / 10)}"
+                               style="width: 70px">
+                    </td>
+                    <td>${disc.current_hours}h</td>
+                    <td>${disc.required_hours}h</td>
+                    <td>${disc.complete}</td>
+                </tr>`;
+        });
+
+        html += `</tbody>
+            </table>
+            <p class="submit">
+                <input type="submit" name="submit" id="submit" class="button button-primary" value="Salvar Alterações">
+            </p>
+        </form>`;
         return html;
     }
 });
