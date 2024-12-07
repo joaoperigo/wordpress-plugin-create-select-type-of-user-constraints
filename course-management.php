@@ -2,6 +2,7 @@
 /*
 Plugin Name: Course Management System
 Description: Manages course assignments and progress for different professional areas
+Author: Joao Perigo
 Version: 1.0
 */
 
@@ -29,7 +30,7 @@ class CourseManagementSystem {
 
     private $course_requirements = [
         'biologia' => [
-            'proc_baixa_media' => 360,
+            'proc_baixa_media' => 100,
             'toxina' => 10,
             'preenchimento' => 10,
             'bioestimuladores' => 10,
@@ -37,14 +38,14 @@ class CourseManagementSystem {
             'workshop' => 220
         ],
         'fisioterapia' => [
-            'proc_baixa_media' => 100,
+            'proc_baixa_media' => 40,
             'toxina' => 30,
             'preenchimento' => 10,
             'bioestimuladores' => 10,
             'fios' => 10
         ],
         'default' => [
-            'proc_baixa_media' => 100,
+            'proc_baixa_media' => 60,
             'toxina' => 10,
             'preenchimento' => 10,
             'bioestimuladores' => 10,
