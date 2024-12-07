@@ -1,4 +1,10 @@
 jQuery(document).ready(function($) {
+    // Define o valor inicial do curso selecionado ao carregar a página
+    $('.course-select').each(function() {
+        $(this).data('previous-course', $(this).find(':selected').text());
+        $(this).data('previous-value', $(this).val());
+    });
+
     // Handle course selection change
     $('.course-select').on('change', function() {
         const userId = $(this).data('user-id');
@@ -8,14 +14,17 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        if ($(this).find(':selected').text() !== $(this).data('previous-course')) {
-            if ($(this).data('previous-course')) {
-                if (!confirm('Mudar o curso irá deletar todo o progresso atual. Deseja continuar?')) {
-                    $(this).val($(this).data('previous-value'));
-                    return;
-                }
+        // Compara com o valor anterior
+        if ($(this).find(':selected').text() !== $(this).data('previous-course') && $(this).data('previous-course')) {
+            if (!confirm('Mudar o curso irá deletar todo o progresso atual. Deseja continuar?')) {
+                $(this).val($(this).data('previous-value'));
+                return;
             }
         }
+
+        // Fecha o modal se estiver aberto
+        $('#discipline-modal').hide();
+        $('#disciplines-form').empty();
 
         $.ajax({
             url: courseManagement.ajax_url,

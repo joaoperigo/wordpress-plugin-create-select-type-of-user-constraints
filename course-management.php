@@ -59,9 +59,8 @@ class CourseManagementSystem {
         add_action('wp_ajax_update_discipline_progress', [$this, 'update_discipline_progress']);
         add_action('wp_ajax_get_user_disciplines', [$this, 'get_user_disciplines']);
         
-        // Registrar shortcodes
+        // Registrar shortcode
         add_shortcode('course_progress', [$this, 'render_course_progress']);
-        add_shortcode('discipline_schedule', [$this, 'render_discipline_schedule']);
     }
 
     public function render_course_progress($atts) {
@@ -188,39 +187,15 @@ class CourseManagementSystem {
     }
 
     private function get_discipline_shortcode($discipline_key) {
-        // Mapeamento de disciplinas para shortcodes
         $shortcodes = [
             'toxina' => '[latepoint_resources items="services" group_ids="1"]',
-            // Adicione mais shortcodes conforme necessário
+            'preenchimento' => '[latepoint_resources items="services" group_ids="2"]',
+            'bioestimuladores' => '[latepoint_resources items="services" group_ids="3"]',
+            'fios' => '[latepoint_resources items="services" group_ids="4"]',
+            'proc_baixa_media' => '[latepoint_resources items="services" group_ids="5"]'
         ];
 
         return $shortcodes[$discipline_key] ?? '';
-    }
-
-    public function render_discipline_schedule($atts) {
-        $atts = shortcode_atts([
-            'discipline' => '',
-        ], $atts);
-
-        if (!is_user_logged_in() || empty($atts['discipline'])) {
-            return '';
-        }
-
-        $user_id = get_current_user_id();
-        $course_data = json_decode(get_user_meta($user_id, 'course_data', true), true);
-
-        if (!$course_data || !isset($course_data['disciplinas'][$atts['discipline']])) {
-            return '';
-        }
-
-        $disc_data = $course_data['disciplinas'][$atts['discipline']];
-        
-        // Só mostra o shortcode se a disciplina estiver liberada e incompleta
-        if ($disc_data[0] === 'liberado' && $disc_data[2] === 'incompleto') {
-            return do_shortcode($this->get_discipline_shortcode($atts['discipline']));
-        }
-
-        return '';
     }
     
     public function get_user_disciplines() {
